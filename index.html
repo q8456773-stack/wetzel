@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Generate & Edit Images</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Roboto+Mono&family=Permanent+Marker&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="index.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.sh/@google/genai@^1.4.0",
+          "react/": "https://aistudiocdn.com/react@^19.1.1/",
+          "react": "https://aistudiocdn.com/react@^19.1.1",
+          "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+          "framer-motion": "https://aistudiocdn.com/framer-motion@^11.3.12"
+        }
+      }
+    </script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body class="bg-[#1E1F20] font-['Inter'] text-gray-300 antialiased">
+    <div
+      class="min-h-screen flex items-center justify-center p-4"
+      role="main"
+    >
+      <div
+        class="bg-[#2a2b2e] px-8 pt-8 pb-6 rounded-2xl shadow-2xl w-full max-w-2xl space-y-6"
+      >
+        <div class="text-center">
+          <h1 class="text-3xl font-bold text-white tracking-tight">
+            Generate & Edit Images
+          </h1>
+          <p class="text-gray-400 mt-2 text-sm">
+            Generate images with Imagen or edit uploaded photos with Gemini.<br />
+            Upload a selfie and describe the scene (e.g., "at sunset").
+          </p>
+        </div>
+
+        <div class="space-y-4">
+          <!-- Image Upload Section -->
+          <div class="w-full">
+            <label class="block text-gray-400 text-sm mb-2 font-medium">Reference Image (Optional)</label>
+            <div class="relative">
+              <input type="file" id="image-input" accept="image/*" class="hidden" />
+              <label for="image-input" 
+                     class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer bg-[#353739] hover:bg-[#3e4143] transition-colors group">
+                  <div class="flex flex-col items-center justify-center pt-5 pb-6 text-gray-400 group-hover:text-gray-300">
+                      <svg class="w-8 h-8 mb-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                      </svg>
+                      <p class="text-sm"><span class="font-semibold">Click to upload</span> your photo</p>
+                  </div>
+              </label>
+              <div id="image-preview-container" class="hidden absolute inset-0 bg-[#353739] rounded-lg flex items-center justify-center overflow-hidden">
+                   <img id="image-preview" class="h-full w-full object-contain" />
+                   <button id="remove-image" class="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors focus:outline-none backdrop-blur-sm">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                   </button>
+              </div>
+            </div>
+          </div>
+
+          <textarea
+            id="prompt-input"
+            rows="4"
+            class="w-full bg-[#353739] border border-gray-600 rounded-lg p-4 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow duration-200 resize-none"
+            placeholder="Describe the image you want to generate, or how to edit your uploaded photo..."
+            aria-label="Image generation prompt"
+          ></textarea>
+        </div>
+
+        <button
+          id="generate-button"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-400 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+        >
+          Generate
+        </button>
+
+        <div class="w-full">
+          <img
+            id="output-image"
+            alt="Generated image"
+            class="w-full rounded-lg hidden"
+          />
+        </div>
+
+        <p id="status" class="text-center text-gray-400 min-h-[24px]"></p>
+      </div>
+    </div>
+    <script type="module" src="index.tsx"></script>
+
+    <div id="banner-root"></div>
+    <script type="text/babel" data-type="module">
+      import React, { useState, useEffect } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { motion, AnimatePresence } from 'framer-motion';
+
+      const REMIX_IDEAS = [
+        "to generate a movie poster.",
+        "to visualize a product placement.",
+        "to reimagine your character designs.",
+        "to create new scenes",
+        "to preview different camera shots.",
+      ];
+
+      const CloseIcon = () => (
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      );
+
+      const Banner = () => {
+          const [isVisible, setIsVisible] = useState(true);
+          const [index, setIndex] = useState(0);
+
+          useEffect(() => {
+              const intervalId = setInterval(() => {
+                  setIndex(prevIndex => (prevIndex + 1) % REMIX_IDEAS.length);
+              }, 3500);
+
+              return () => clearInterval(intervalId);
+          }, []);
+
+          const handleSelectKeyClick = async (e) => {
+            e.preventDefault();
+            if (window.aistudio?.openSelectKey) {
+              await window.aistudio.openSelectKey();
+            } else {
+              console.log('window.aistudio.openSelectKey() not available.');
+              alert('API key selection is not available in this environment.');
+            }
+          };
+          
+          if (!isVisible) {
+            return null;
+          }
+
+          return (
+              <header className="app-banner">
+                  <div className="app-banner-content">
+                      <div className="banner-left">
+                          <p>Powered by the Gemini API</p>
+                      </div>
+                      <div className="remix-ideas">
+                          <span className="remix-prompt">Remix this app...</span>
+                          <div className="remix-text-container">
+                              <AnimatePresence mode="wait">
+                                  <motion.span
+                                      key={index}
+                                      initial={{ opacity: 0, y: 10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, y: -10 }}
+                                      transition={{ duration: 0.4, ease: "easeInOut" }}
+                                      className="remix-text"
+                                  >
+                                      {REMIX_IDEAS[index]}
+                                  </motion.span>
+                              </AnimatePresence>
+                          </div>
+                      </div>
+                      <div className="banner-right">
+                          <div className="banner-buttons">
+                              <a
+                                  href="https://aistudio.google.com/apps"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="banner-button button-gemini-chat"
+                              >
+                                  Apps on AI Studio
+                              </a>
+                              <a
+                                  href="#"
+                                  onClick={handleSelectKeyClick}
+                                  className="banner-button button-ai-studio"
+                              >
+                                  Add your API Key
+                              </a>
+                          </div>
+                          <button
+                            className="close-button"
+                            onClick={() => setIsVisible(false)}
+                            aria-label="Close notice">
+                            <CloseIcon />
+                          </button>
+                      </div>
+                  </div>
+              </header>
+          );
+      };
+
+      const container = document.getElementById('banner-root');
+      if (container) {
+        const root = createRoot(container);
+        root.render(<React.StrictMode><Banner /></React.StrictMode>);
+      }
+    </script>
+  </body>
+</html>

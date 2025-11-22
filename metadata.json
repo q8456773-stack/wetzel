@@ -1,0 +1,5 @@
+{
+  "name": "wetzel",
+  "description": "Sample from Imagen models to generate images",
+  "requestFramePermissions": []
+}
